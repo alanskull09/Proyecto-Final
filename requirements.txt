@@ -1,0 +1,2 @@
+# No hay dependencias externas requeridas.
+# El proyecto SBAC utiliza exclusivamente librerías estándar de Python 3.9+ (os, sys, json, hashlib, difflib, etc.).

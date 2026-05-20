@@ -1,0 +1,7 @@
+# Ocultar la carpeta de tu propio sistema AC
+.sbac/
+
+# Ocultar archivos temporales de Python
+__pycache__/
+*.pyc
+.pytest_cache/
