@@ -71,5 +71,25 @@ class TestSBAC(unittest.TestCase):
         os.remove(tmp_file)
         os.remove(".sbacignore")
 
+    def test_05_regression_checkout(self):
+        """Prueba de regresión: Verificar que un checkout restaura exactamente el estado antiguo."""
+        self.app.init()
+        self.app.add(self.test_file)
+        self.app.commit("version_limpia")
+        
+        # Introducir una modificación indeseada
+        with open(self.test_file, "a") as f:
+            f.write("\n# Linea introducida por error\n")
+        self.app.commit("version_con_error")
+        
+        # Ejecutar la reversión (checkout)
+        v1_id = self.app.history()[1]['id']
+        self.app.checkout(v1_id)
+        
+        # Validar regresión: El archivo no debe contener el texto de la versión 2
+        with open(self.test_file, "r") as f:
+            content = f.read()
+        self.assertNotIn("# Linea introducida por error", content)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

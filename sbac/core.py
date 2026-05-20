@@ -15,11 +15,13 @@ class SBAC:
     def __init__(self):
         self.conn = None
         if os.path.exists(DB_FILE):
-            self.conn = sqlite3.connect(DB_FILE)
+            # Aquí está la primera corrección
+            self.conn = sqlite3.connect(DB_FILE, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row
 
     def _init_db(self):
-        self.conn = sqlite3.connect(DB_FILE)
+        # Y aquí está la segunda corrección
+        self.conn = sqlite3.connect(DB_FILE, check_same_thread=False)
         cursor = self.conn.cursor()
         cursor.executescript("""
             CREATE TABLE IF NOT EXISTS tracked_files (filepath TEXT PRIMARY KEY);
