@@ -4,74 +4,242 @@
     <meta charset="UTF-8">
     <title>SBAC - Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { 
+            background-color: #f3f4f6; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+        }
+        /* Tarjetas con efecto hover */
+        .card { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .card-header { 
+            border-radius: 12px 12px 0 0 !important; 
+            font-weight: 600; 
+            letter-spacing: 0.5px;
+            padding: 1rem 1.25rem;
+        }
+        
+        /* Listas de archivos */
+        .file-list { max-height: 400px; overflow-y: auto; }
+        .file-item { 
+            padding: 0.5rem 1.25rem; 
+            font-family: 'Consolas', 'Courier New', monospace; 
+            font-size: 0.85rem; 
+            border: none;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .file-item i { margin-right: 10px; font-size: 1rem; }
+        
+        /* Cabeceras de estado con insignias */
+        .status-header {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 0.5rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Colores específicos */
+        .header-staged { background-color: #ecfdf5; color: #059669; }
+        .item-staged i { color: #10b981; }
+        
+        .header-modified { background-color: #fffbeb; color: #d97706; }
+        .item-modified i { color: #f59e0b; }
+        
+        .header-untracked { background-color: #f3f4f6; color: #4b5563; }
+        .item-untracked i { color: #9ca3af; }
+
+        /* Línea de tiempo para Commits */
+        .timeline { border-left: 2px solid #e5e7eb; margin-left: 1rem; padding-left: 1.5rem; position: relative; }
+        .timeline-item { position: relative; margin-bottom: 1.5rem; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -1.85rem; top: 0.25rem;
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #3b82f6; border: 2px solid #fff;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .commit-hash {
+            background-color: #f3f4f6; padding: 0.1rem 0.4rem; 
+            border-radius: 4px; font-family: monospace; color: #4b5563; font-size: 0.8rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container mt-5">
-        <h2 class="mb-4 text-primary">📦 Panel de Control SBAC</h2>
+<body>
+    <div class="container mt-4 mb-5">
+        <div class="d-flex align-items-center mb-4">
+            <i class="bi bi-box-seam text-primary fs-1 me-3"></i>
+            <h2 class="text-dark fw-bold mb-0">Panel de Control SBAC</h2>
+        </div>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
+              <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
             {% endfor %}
           {% endif %}
         {% endwith %}
 
         {% if not is_init %}
-            <div class="card p-4 text-center">
-                <h4>El repositorio no está inicializado</h4>
-                <form action="/init" method="POST" class="mt-3">
-                    <button type="submit" class="btn btn-success">Inicializar Repositorio</button>
+            <div class="card p-5 text-center shadow-sm mt-5">
+                <div class="mb-4">
+                    <i class="bi bi-folder-x text-secondary" style="font-size: 4rem;"></i>
+                </div>
+                <h4 class="text-dark fw-bold mb-3">El repositorio no está inicializado</h4>
+                <p class="text-muted mb-4">Inicia un nuevo repositorio SBAC para comenzar a rastrear tus archivos.</p>
+                <form action="/init" method="POST">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 rounded-pill shadow-sm">
+                        <i class="bi bi-rocket-takeoff me-2"></i> Inicializar Repositorio
+                    </button>
                 </form>
             </div>
         {% else %}
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header bg-dark text-white">Archivos en Seguimiento</div>
-                        <div class="card-body">
-                            <ul class="list-group mb-3">
-                                {% for f in files %}
-                                    <li class="list-group-item">📄 {{ f }}</li>
-                                {% else %}
-                                    <li class="list-group-item text-muted">No hay archivos rastreados.</li>
-                                {% endfor %}
-                            </ul>
-                            <form action="/add" method="POST" class="d-flex">
-                                <input type="text" name="filename" class="form-control me-2" placeholder="ruta/del/archivo.py" required>
-                                <button type="submit" class="btn btn-primary">Añadir (Add)</button>
-                            </form>
+            <div class="row g-4">
+                <div class="col-md-7">
+                    <div class="card h-100">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-hdd-network me-2"></i> Estado del Repositorio</span>
                         </div>
-                    </div>
+                        
+                        <div class="file-list bg-white">
+                            {% if files.staged %}
+                                <div class="status-header header-staged">
+                                    <span>Listos para Commit</span>
+                                    <span class="badge bg-success rounded-pill">{{ files.staged|length }}</span>
+                                </div>
+                                <ul class="list-group list-group-flush mb-0">
+                                    {% for f in files.staged %} 
+                                        <li class="list-group-item file-item item-staged">
+                                            <i class="bi bi-check-circle-fill"></i> {{ f }}
+                                        </li> 
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            
+                            {% if files.modified %}
+                                <div class="status-header header-modified">
+                                    <span>Modificados</span>
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ files.modified|length }}</span>
+                                </div>
+                                <ul class="list-group list-group-flush mb-0">
+                                    {% for f in files.modified %} 
+                                        <li class="list-group-item file-item item-modified">
+                                            <i class="bi bi-exclamation-circle-fill"></i> {{ f }}
+                                        </li> 
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            
+                            {% if files.untracked %}
+                                <div class="status-header header-untracked">
+                                    <span>No Rastreados</span>
+                                    <span class="badge bg-secondary rounded-pill">{{ files.untracked|length }}</span>
+                                </div>
+                                <ul class="list-group list-group-flush mb-0">
+                                    {% for f in files.untracked %} 
+                                        <li class="list-group-item file-item item-untracked">
+                                            <i class="bi bi-file-earmark-plus"></i> {{ f }}
+                                        </li> 
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            
+                            {% if not files.staged and not files.modified and not files.untracked %}
+                                <div class="p-5 text-center text-muted">
+                                    <i class="bi bi-stars fs-2 mb-2 d-block text-warning"></i>
+                                    <h5>Árbol de trabajo limpio</h5>
+                                    <p class="small">No hay cambios pendientes por confirmar.</p>
+                                </div>
+                            {% endif %}
+                        </div>
 
-                    <div class="card mb-4">
-                        <div class="card-header bg-success text-white">Crear Nueva Versión</div>
-                        <div class="card-body">
-                            <form action="/commit" method="POST">
-                                <input type="text" name="message" class="form-control mb-2" placeholder="Mensaje del commit..." required>
-                                <button type="submit" class="btn btn-success w-100">Hacer Commit</button>
+                        <div class="card-footer bg-light border-top-0 p-3 rounded-bottom">
+                            <form action="/add" method="POST" class="d-flex align-items-center">
+                                <i class="bi bi-plus-square-dotted text-primary me-2 fs-4"></i>
+                                
+                                <input type="text" name="filename" list="file-suggestions" class="form-control me-2" placeholder="Ej: app.py o carpeta/" required autocomplete="off">
+                                
+                                <datalist id="file-suggestions">
+                                    {% for f in all_files %}
+                                        <option value="{{ f }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                                
+                                <button type="submit" class="btn btn-primary px-4 fw-bold">Añadir</button>
                             </form>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <div class="card mb-4">
-                        <div class="card-header bg-secondary text-white">Historial de Commits</div>
-                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                            {% for c in history %}
-                                <div class="border-bottom mb-2 pb-2">
-                                    <strong>{{ c.message }}</strong><br>
-                                    <small class="text-muted">ID: {{ c.id }} | {{ c.timestamp }}</small>
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-save2 me-2"></i> Crear Nueva Versión
+                        </div>
+                        <div class="card-body">
+                            <form action="/commit" method="POST">
+                                <textarea name="message" class="form-control mb-3 bg-light" rows="2" placeholder="Mensaje descriptivo del commit..." required></textarea>
+                                <button type="submit" class="btn btn-success w-100 fw-bold">
+                                    <i class="bi bi-check2-all me-1"></i> Guardar Commit
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <i class="bi bi-clock-history me-2"></i> Historial de Commits
+                        </div>
+                        <div class="card-body file-list p-4">
+                            {% if history %}
+                                <div class="timeline">
+                                    {% for c in history %}
+                                        <div class="timeline-item">
+                                            <h6 class="mb-1 fw-bold text-dark">{{ c.message }}</h6>
+                                            <div class="d-flex align-items-center mb-1">
+                                                <span class="commit-hash me-2"><i class="bi bi-hash"></i>{{ c.id }}</span>
+                                                <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ c.timestamp[:19] }}</small>
+                                                
+                                                <form action="/delete_commit/{{ c.id }}" method="POST" class="ms-auto" onsubmit="return confirm('¿Estás seguro de que deseas eliminar permanentemente este commit?');">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar commit">
+                                                        <i class="bi bi-trash3-fill"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
                                 </div>
                             {% else %}
-                                <p class="text-muted">No hay commits registrados.</p>
-                            {% endfor %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="bi bi-journal-x fs-1 d-block mb-2"></i>
+                                    <small>No hay commits registrados aún.</small>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
         {% endif %}
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -27,7 +27,7 @@ def main():
     
     parser_diff = subparsers.add_parser("diff", help="Mostrar diferencias entre versiones")
     parser_diff.add_argument("v1", type=str, help="Versión 1")
-    parser_diff.add_argument("v2", type=str, help="Versión 2")
+    parser_diff.add_argument("v2", type=str, nargs='?', default=None, help="Versión 2 (Opcional)")
     
     parser_checkout = subparsers.add_parser("checkout", help="Regresar a una versión anterior")
     parser_checkout.add_argument("version", type=str, help="Versión o línea base")
@@ -41,8 +41,19 @@ def main():
         elif args.command == "add":
             print(app.add(args.archivo))
         elif args.command == "status":
-            files = app.status()
-            print("Archivos en seguimiento:\n" + "\n".join([f"  - {f}" for f in files]) if files else "Ningún archivo en seguimiento.")
+            st = app.status()
+            print("Estado del repositorio:")
+            if st["staged"]:
+                print("\nCambios listos para commit (Staged):")
+                for f in st["staged"]: print(f"  🟢 {f}")
+            if st["modified"]:
+                print("\nArchivos modificados (no staged):")
+                for f in st["modified"]: print(f"  🟡 {f}")
+            if st["untracked"]:
+                print("\nArchivos no rastreados:")
+                for f in st["untracked"]: print(f"  ⚪ {f}")
+            if not any(st.values()):
+                print("\nNada para confirmar, el árbol de trabajo está limpio.")
         elif args.command == "commit":
             print(app.commit(args.mensaje))
         elif args.command == "history":
@@ -55,10 +66,13 @@ def main():
                 print(f"{name} -> {cid}")
         elif args.command == "diff":
             diffs = app.diff(args.v1, args.v2)
-            for f, d in diffs:
-                print(f"--- Diferencias en {f} ---")
-                sys.stdout.writelines(d)
-                print()
+            if not diffs:
+                print("No hay diferencias detectadas.")
+            else:
+                for f, d in diffs:
+                    print(f"--- Diferencias en {f} ---")
+                    sys.stdout.writelines(d)
+                    print()
         elif args.command == "checkout":
             print(app.checkout(args.version))
         else:

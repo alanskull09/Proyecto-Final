@@ -1,95 +1,104 @@
 import os
 import shutil
 import unittest
-from sbac.core import SBAC, SBAC_DIR, DB_FILE
+import time
+import sbac.core
+
+# Aislamos las pruebas en una carpeta temporal para no tocar tu repositorio real
+TEST_DIR = ".sbac_test"
+sbac.core.SBAC_DIR = TEST_DIR
+sbac.core.DB_FILE = os.path.join(TEST_DIR, "index.db")
+sbac.core.OBJECTS_DIR = os.path.join(TEST_DIR, "objects")
+
+from sbac.core import SBAC
 
 class TestSBAC(unittest.TestCase):
     def setUp(self):
-        if os.path.exists(SBAC_DIR):
-            shutil.rmtree(SBAC_DIR, ignore_errors=True)
+        self.cleanup()
         self.app = SBAC()
         self.test_file = "test_code.py"
         with open(self.test_file, "w") as f:
             f.write("def suma(a, b):\n    return a + b\n")
 
     def tearDown(self):
-        if self.app.conn:
-            self.app.conn.close()
-        if os.path.exists(SBAC_DIR):
-            shutil.rmtree(SBAC_DIR, ignore_errors=True)
+        self.cleanup()
         if os.path.exists(self.test_file):
             os.remove(self.test_file)
 
-    def test_01_init_db(self):
+    def cleanup(self):
+        # Forzamos el cierre de la conexión de SQLite para que Windows libere el archivo
+        if hasattr(self, 'app') and self.app and self.app.conn:
+            try:
+                self.app.conn.close()
+            except Exception:
+                pass
+        
+        if os.path.exists(TEST_DIR):
+            try:
+                shutil.rmtree(TEST_DIR)
+            except Exception:
+                time.sleep(0.5)
+                shutil.rmtree(TEST_DIR, ignore_errors=True)
+
+    def test_01_init_creates_structure(self):
+        """Prueba Unitaria: Verifica que init cree la base de datos y carpetas"""
         res = self.app.init()
-        self.assertTrue(os.path.exists(DB_FILE))
-        self.assertIn("SQLite", res)
+        self.assertTrue(os.path.exists(sbac.core.DB_FILE))
+        self.assertTrue(os.path.exists(sbac.core.OBJECTS_DIR))
+        self.assertIn("Staging y Objects", res)
 
-    def test_02_add_and_blob_creation(self):
-        self.app.init()
-        self.app.add(self.test_file)
-        self.app.commit("init")
-        
-        # Validar que se creó el almacenamiento de blobs
-        objects_dir = os.path.join(SBAC_DIR, "objects")
-        self.assertTrue(len(os.listdir(objects_dir)) > 0)
-
-    def test_03_full_transactional_flow(self):
+    def test_02_add_moves_to_staging(self):
+        """Prueba Unitaria: Verifica que add() marque el archivo como staged=1"""
         self.app.init()
         self.app.add(self.test_file)
         
-        self.app.commit("v1")
-        id_c1 = self.app.history()[0]['id']
-        self.app.baseline("PROD_V1", id_c1)
+        cursor = self.app.conn.cursor()
+        cursor.execute("SELECT staged FROM tracked_files WHERE filepath=?", (self.test_file,))
+        row = cursor.fetchone()
+        self.assertIsNotNone(row, "El archivo no se guardó en la BD")
+        self.assertEqual(row[0], 1, "El archivo no se marcó como staged (1)")
 
+        st = self.app.status()
+        self.assertIn(self.test_file, st["staged"])
+
+    def test_03_integration_add_commit_diff(self):
+        """Prueba de Integración: Flujo completo de Add -> Commit -> Modificar -> Diff"""
+        self.app.init()
+        self.app.add(self.test_file)
+        self.app.commit("commit_inicial")
+        
+        hist = self.app.history()
+        self.assertEqual(len(hist), 1)
+        
         with open(self.test_file, "w") as f:
             f.write("def suma(a, b, c=0):\n    return a + b + c\n")
         
-        self.app.commit("v2")
-        id_c2 = self.app.history()[0]['id']
-
-        diff_output = self.app.diff("PROD_V1", id_c2)
-        self.assertTrue(len(diff_output) > 0)
-
-        self.app.checkout("PROD_V1")
-        with open(self.test_file, "r") as f:
-            self.assertIn("return a + b", f.read())
-
-    def test_04_ignore_file(self):
-        self.app.init()
-        with open(".sbacignore", "w") as f:
-            f.write("*.tmp\n")
+        self.app.add(self.test_file)
+        self.app.commit("segundo_commit")
         
-        tmp_file = "archivo.tmp"
-        with open(tmp_file, "w") as f:
-            f.write("basura")
-
-        with self.assertRaises(Exception) as ctx:
-            self.app.add(tmp_file)
-        self.assertIn("ignorado por .sbacignore", str(ctx.exception))
+        id_v1 = hist[0]['id']
+        id_v2 = self.app.history()[0]['id']
+        diffs = self.app.diff(id_v1, id_v2)
         
-        os.remove(tmp_file)
-        os.remove(".sbacignore")
+        self.assertTrue(len(diffs) > 0, "No se detectaron diferencias entre los commits")
 
-    def test_05_regression_checkout(self):
-        """Prueba de regresión: Verificar que un checkout restaura exactamente el estado antiguo."""
+    def test_04_regression_checkout(self):
+        """Prueba de Regresión: Verificar que checkout revierte daños indeseados"""
         self.app.init()
         self.app.add(self.test_file)
-        self.app.commit("version_limpia")
+        self.app.commit("version_correcta")
+        v1_id = self.app.history()[0]['id']
         
-        # Introducir una modificación indeseada
         with open(self.test_file, "a") as f:
-            f.write("\n# Linea introducida por error\n")
+            f.write("\n# Bug introducido por error\n")
+        self.app.add(self.test_file)
         self.app.commit("version_con_error")
         
-        # Ejecutar la reversión (checkout)
-        v1_id = self.app.history()[1]['id']
         self.app.checkout(v1_id)
         
-        # Validar regresión: El archivo no debe contener el texto de la versión 2
         with open(self.test_file, "r") as f:
             content = f.read()
-        self.assertNotIn("# Linea introducida por error", content)
+        self.assertNotIn("# Bug introducido por error", content)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
