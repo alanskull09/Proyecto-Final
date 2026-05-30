@@ -1,0 +1,26 @@
+# Proyecto Final para el Curso de Pruebas de Software y Administración de la Configuración
+
+## Sistema Básico de Administración de Configuración (SBAC)
+
+**Autor y Responsable:**
+- Alan Oliver López Robles (QA & Developer)
+
+---
+
+### 📌 Notas del Proyecto:
+
+Este repositorio contiene la implementación de un sistema de control de versiones emulando las funciones centrales de herramientas como Git, incorporando almacenamiento comprimido (zlib), indexación por hashes SHA-1, y trazabilidad de commits.
+
+A diferencia de un proyecto de consola convencional, este sistema cuenta con dos modos de uso: una Interfaz de Línea de Comandos (CLI) y un **Dashboard Web interactivo** construido con Flask. 
+
+### 📂 Estructura del Repositorio:
+- **`sbac/`**: Contiene el código fuente del núcleo del sistema de AC (`core.py`).
+- **`tests/`**: Contiene el código de pruebas automatizadas y de regresión del sistema (`test_core.py` basado en el framework `unittest`). aislando el entorno en una carpeta temporal `.sbac_test`.
+- **`app.py`**: Código principal para levantar el servidor y la Interfaz Gráfica Web (Dashboard).
+- **`cli.py`**: Interfaz de Línea de Comandos para operar el sistema desde la terminal.
+- **`docs/`**: Carpeta que contiene la Documentación formal de pruebas bajo el estándar **IEEE 829** y el **Manual de Usuario**.
+
+---
+
+### 🚀 ¿Cómo empezar?
+Para conocer los comandos, requisitos de instalación y el funcionamiento del panel web interactivo, por favor consulta el **Manual de Usuario** ubicado en este repositorio.

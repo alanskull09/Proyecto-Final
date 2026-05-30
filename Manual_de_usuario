@@ -1,0 +1,62 @@
+# Manual de Usuario - Sistema Básico de Administración de Configuración (SBAC)
+
+El Sistema Básico de Administración de Configuración (SBAC) es una herramienta diseñada para gestionar el control de versiones de archivos de código. A diferencia de sistemas simples, SBAC cuenta con almacenamiento optimizado por compresión, trazabilidad de historial real (padre-hijo) y dos modos de uso: **Línea de Comandos (CLI)** e **Interfaz Gráfica Web (Dashboard)**.
+
+## Requisitos Previos e Instalación
+
+Para utilizar el sistema SBAC, se requiere cumplir con lo siguiente:
+* Tener instalada la versión **3.13.2** de Python.
+* Debido a que el código del Core usa bibliotecas estándar de Python (`sqlite3`, `hashlib`, `zlib`, `difflib`), el uso de la terminal no necesita instalar ningún paquete externo.
+* Para utilizar la interfaz Web, es necesario instalar el framework Flask ejecutando el siguiente comando en la terminal:
+  `pip install -r requirements.txt`
+
+---
+
+## MODO 1: Interfaz de Línea de Comandos (CLI)
+
+Para ejecutar el programa en la terminal se necesita escribir "python" seguido del nombre del programa (`cli.py`) y de la instrucción que se desea realizar. A continuación se listan los posibles comandos dentro del programa junto su funcionalidad.
+
+* **`python cli.py init`**
+  Este comando inicializa el repositorio, junto con esto crea una carpeta oculta `.sbac` con subdirectorios para objetos (`objects/`). Además, crea la base de datos creando un archivo con tablas para guardar lo necesario (`index.db`) y finalmente registra la estructura base.
+
+* **`python cli.py add <archivo>`**
+  Prepara un archivo. Se calcula mediante Secure Hash Algorithm 1 (SHA1) el hash del archivo, se comprime y almacena una copia en `.sbac/objects/`. Finalmente, se registra el estado del archivo en la tabla como `staged = 1`. *(Nota: Si el archivo fue borrado físicamente, este comando registra su "eliminación oficial" en el sistema).*
+
+* **`python cli.py status`**
+  Muestra el estado actual del repositorio, es decir, muestra los archivos registrados en la tabla como `staged = 1` (listos para commit), detecta archivos modificados e identifica los archivos no rastreados.
+
+* **`python cli.py diff [archivo]`**
+  Muestra las diferencias entre archivos modificados y sus versiones guardadas, haciendo uso de `difflib`. Si no se especifica el archivo, muestra la diferencia entre todos los archivos modificados en el repositorio actual frente a versiones históricas.
+
+* **`python cli.py commit "mensaje"`**
+  Genera un ID único para el commit usando SHA1 y timestamp (marca de tiempo). Registra la fecha, el mensaje y, si existe, el commit padre. Además, copia los archivos en estado staged hacia la tabla definitiva `commit_files`.
+
+* **`python cli.py history`**
+  Muestra el historial de los commits hechos ordenados por fecha. Consulta la tabla de commits y muestra el ID (acortado), el mensaje y el momento de guardado.
+
+* **`python cli.py baseline "nombre"`**
+  Crea un punto de referencia (línea base) asociado al último commit. Registra el nombre y el ID del último commit en la tabla `baselines`, es decir, este commit se puede usar como referencia en futuros comandos.
+
+* **`python cli.py list-baselines`**
+  Lista todas las baselines con el commit al que fueron asociadas. Internamente une las tablas `baselines` y `commits` para mostrar los nombres, los mensajes y los IDs.
+
+* **`python cli.py checkout <version>`**
+  Ayuda a restaurar los archivos a una versión específica usando el commit ID o el nombre de la baseline. Busca en ambos el ID correspondiente, recupera los archivos comprimidos desde `.sbac/objects/` y los copia sobrescribiendo el directorio de trabajo.
+
+---
+
+## MODO 2: Panel de Control Web (Dashboard)
+
+Para facilitar la administración del proyecto y ofrecer una experiencia visual más amigable, SBAC cuenta con una interfaz gráfica basada en la web.
+
+**¿Cómo iniciarlo?**
+1. Abre tu terminal en la raíz del proyecto.
+2. Ejecuta el servidor corriendo el comando:
+   `python app.py`
+3. Abre tu navegador web y dirígete a la dirección: `http://127.0.0.1:5000`
+
+**Características del Dashboard:**
+* **Gestión Visual de Estados:** Observa en tiempo real (con contadores dinámicos) qué archivos están modificados, no rastreados o listos para commit mediante un sistema de colores e iconos.
+* **Autocompletado de Archivos:** La barra para añadir archivos (Add) cuenta con sugerencias inteligentes automáticas que detectan qué archivos en tu proyecto necesitan ser rastreados o han sido eliminados.
+* **Línea de Tiempo Interactiva:** El historial de commits se presenta de forma cronológica mediante una línea de tiempo (Timeline) con todos los metadatos y hashes.
+* **Eliminación de Commits:** Permite eliminar permanentemente un commit haciendo clic en el icono de papelera. El sistema deshace el registro en la base de datos y devuelve los archivos de forma segura a su estado previo (modificados/no rastreados) para que puedas volver a intentar tu guardado sin perder el progreso.
